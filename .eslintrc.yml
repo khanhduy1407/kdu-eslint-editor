@@ -1,0 +1,10 @@
+root: true
+extends:
+  - plugin:@mysticatea/es2015
+  - plugin:@mysticatea/+modules
+
+# To use dynamic imports.
+overrides:
+  - files: "*.kdu"
+    parserOptions:
+      parser: babel-eslint

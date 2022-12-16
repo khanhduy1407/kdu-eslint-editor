@@ -1,3 +1,7 @@
+/**
+ * @author NKDuy
+ * See LICENSE file in root directory for full license.
+ */
 import path from "path"
 import fs from "fs-extra"
 import rollup from "rollup"
@@ -41,17 +45,14 @@ export default () => ({
                 plugins: [minify()],
             })
 
-            const { output } = await bundle.generate({
+            const { code } = await bundle.generate({
                 format: "iife",
                 name: path.basename(id, ".js").replace(/\./gu, ""),
             })
-            if (output.length > 1) {
-                throw new Error(`Multiple chunks were generated for '${id}'`)
-            }
 
-            const nameStr = JSON.stringify(path.basename(id))
-            const codeStr = JSON.stringify(output[0].code)
-            const content = `export const worker = new Worker(URL.createObjectURL(new Blob([${codeStr}], { type: "text/javascript" })), { name: ${nameStr} })`
+            const content = `export default URL.createObjectURL(new Blob([${JSON.stringify(
+                code
+            )}], { type: "text/javascript" }))`
 
             await fs.ensureDir(path.dirname(cachePath))
             await fs.writeFile(cachePath, content)

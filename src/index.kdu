@@ -1,41 +1,26 @@
 <template>
-    <div :class="{ 'eslint-editor-dark': dark }" class="eslint-editor-root"><!-- eslint-disable-line @mysticatea/prettier -->
+    <div :class="{'eslint-editor-dark':dark}" class="eslint-editor-root">
         <transition name="eslint-editor-fade" @before-enter="fadeIn">
-            <div
-                k-if="monaco"
-                key="editor"
-                class="eslint-editor-swap-container"
-            >
+            <div k-if="monaco" key="editor" class="eslint-editor-swap-container">
                 <div ref="monaco" class="eslint-editor-monaco" />
                 <div k-if="fix" class="eslint-editor-actions">
-                    <label>
-                        <input k-model="previewFix" type="checkbox"><!-- eslint-disable-line @mysticatea/prettier -->
-                        Preview
-                    </label>
+                    <label><input k-model="previewFix" type="checkbox">Preview</label>
                     <button @click="applyAutofix">
                         Apply
                     </button>
                 </div>
             </div>
             <div k-else key="placeholder" class="eslint-editor-swap-container">
-                <code class="eslint-editor-placeholder-code">{{ code }}</code>
+                <code class="eslint-editor-placeholder-code">
+                    {{ code }}
+                </code>
                 <transition name="eslint-editor-fade">
-                    <div
-                        k-if="monacoLoadingError"
-                        key="error"
-                        class="eslint-editor-placeholder-error"
-                    >
+                    <div k-if="monacoLoadingError" key="error" class="eslint-editor-placeholder-error">
                         Failed to load this editor
                     </div>
-                    <div
-                        k-else
-                        key="loading"
-                        class="eslint-editor-placeholder-loading"
-                    >
+                    <div k-else key="loading" class="eslint-editor-placeholder-loading">
                         <div class="eslint-editor-placeholder-loading-icon">
-                            <div />
-                            <div />
-                            <div />
+                            <div /><div /><div />
                         </div>
                         <div class="eslint-editor-placeholder-loading-message">
                             Now loading...
@@ -58,7 +43,6 @@ const EDITOR_OPTS = {
     minimap: { enabled: false },
     renderControlCharacters: true,
     renderIndentGuides: true,
-    renderValidationDecorations: "on",
     renderWhitespace: "boundary",
     scrollBeyondLastLine: false,
 }
@@ -110,57 +94,6 @@ function dispose(x) {
     }
 }
 
-/**
- * Computes the key string from the given marker.
- * @param {import('monaco-editor').editor.IMarkerData} marker marker
- * @returns {string} the key string
- */
-function computeKey(marker) {
-    const code =
-        (typeof marker.code === "string"
-            ? marker.code
-            : marker.code && marker.code.value) || ""
-    return `[${marker.startLineNumber},${marker.startColumn},${marker.endLineNumber},${marker.endColumn}]-${code}`
-}
-
-/**
- * Create quickfix code action.
- * @param {string} title title
- * @param {import('monaco-editor').editor.IMarkerData} marker marker
- * @param {import('monaco-editor').editor.ITextModel} model model
- * @param { { range: [number, number], text: string } } fix fix data
- * @returns {import('monaco-editor').languages.CodeAction} CodeAction
- */
-function createQuickfixCodeAction(title, marker, model, fix) {
-    const start = model.getPositionAt(fix.range[0])
-    const end = model.getPositionAt(fix.range[1])
-    /**
-     * @type {import('monaco-editor').IRange}
-     */
-    const editRange = {
-        startLineNumber: start.lineNumber,
-        startColumn: start.column,
-        endLineNumber: end.lineNumber,
-        endColumn: end.column,
-    }
-    return {
-        title,
-        diagnostics: [marker],
-        kind: "quickfix",
-        edit: {
-            edits: [
-                {
-                    resource: model.uri,
-                    edit: {
-                        range: editRange,
-                        text: fix.text,
-                    },
-                },
-            ],
-        },
-    }
-}
-
 export default {
     name: "ESLintEditor",
 
@@ -186,6 +119,7 @@ export default {
         },
         dark: {
             type: Boolean,
+            default: false,
         },
         filename: {
             type: String,
@@ -203,6 +137,7 @@ export default {
         },
         fix: {
             type: Boolean,
+            default: false,
         },
         format: {
             type: Object,
@@ -220,7 +155,6 @@ export default {
         return {
             monaco: null,
             monacoLoadingError: null,
-            loadLanguage: null,
             editor: null,
             editing: false,
             messages: [],
@@ -228,8 +162,6 @@ export default {
             fixedMessages: [],
             previewFix: false,
             requestFix: false,
-            editorMessageMap: new Map(),
-            codeActionProviderDisposable: null,
         }
     },
 
@@ -251,63 +183,6 @@ export default {
                 return editor.getModifiedEditor()
             }
             return null
-        },
-
-        /**
-         * @returns {import('monaco-editor').languages.CodeActionProvider}
-         */
-        codeActionProvider() {
-            return {
-                provideCodeActions: (model, _range, context) => {
-                    const { editorMessageMap } = this
-                    const messageMap = editorMessageMap.get(model.uri)
-                    if (context.only !== "quickfix" || !messageMap) {
-                        return {
-                            actions: [],
-                            dispose() {
-                                /* nop */
-                            },
-                        }
-                    }
-
-                    const actions = []
-                    for (const marker of context.markers) {
-                        const message = messageMap.get(computeKey(marker))
-                        if (!message) {
-                            continue
-                        }
-                        if (message.fix) {
-                            actions.push(
-                                createQuickfixCodeAction(
-                                    `Fix this ${message.ruleId} problem`,
-                                    marker,
-                                    model,
-                                    message.fix,
-                                ),
-                            )
-                        }
-                        if (message.suggestions) {
-                            for (const suggestion of message.suggestions) {
-                                actions.push(
-                                    createQuickfixCodeAction(
-                                        `${suggestion.desc} (${message.ruleId})`,
-                                        marker,
-                                        model,
-                                        suggestion.fix,
-                                    ),
-                                )
-                            }
-                        }
-                    }
-
-                    return {
-                        actions,
-                        dispose() {
-                            /* nop */
-                        },
-                    }
-                },
-            }
         },
     },
 
@@ -346,6 +221,7 @@ export default {
             }
         },
 
+        // But it's not shown.
         fixedMessages(value) {
             const editor = this.fixedCodeEditor
             if (editor != null) {
@@ -363,65 +239,35 @@ export default {
         messages(value) {
             const editor = this.codeEditor
             if (editor != null) {
-                this.updateMarkers(editor, value, true)
+                this.updateMarkers(editor, value)
             }
         },
 
         language(value) {
-            const { monaco, loadLanguage } = this
-            if (monaco == null) {
-                // Skip because the initialization logic does this.
-                return
-            }
-
-            ;(async () => {
-                // Load the language editor of the current language.
-                await loadLanguage(value)
-
-                // Skip if the language is not latest
-                if (value !== this.language) {
-                    return
-                }
-
-                // Set the language to the current editors.
+            const { monaco } = this
+            if (monaco != null) {
                 for (const editor of [this.codeEditor, this.fixedCodeEditor]) {
                     if (editor != null) {
                         monaco.editor.setModelLanguage(editor.getModel(), value)
                     }
                 }
-                dispose(this.codeActionProviderDisposable)
-                this.codeActionProviderDisposable = this.monaco.languages.registerCodeActionProvider(
-                    this.language,
-                    this.codeActionProvider,
-                )
-            })().catch(error => {
-                console.error("Failed to set the language '%s':", value, error)
-            })
+            }
         },
     },
 
     mounted() {
-        ;(async () => {
-            // Load the monaco editor lazily.
-            const { monaco, loadLanguage } = await import("./monaco")
-            // Load the language editor of the current language.
-            await loadLanguage(this.language)
-            // Finish loading.
-            this.monaco = monaco
-            this.loadLanguage = loadLanguage
-            this.codeActionProviderDisposable = monaco.languages.registerCodeActionProvider(
-                this.language,
-                this.codeActionProvider,
-            )
-        })().catch(error => {
-            console.error("Failed to load Monaco editor:", error)
-            this.monacoLoadingError = error
-        })
+        import("./monaco").then(
+            ({ default: monaco }) => {
+                this.monaco = monaco
+            },
+            error => {
+                this.monacoLoadingError = error
+            }
+        )
     },
 
     beforeDestroy() {
         dispose(this.editor)
-        dispose(this.codeActionProviderDisposable)
         this.$refs.monaco.innerHTML = ""
         this.editor = null
     },
@@ -456,12 +302,14 @@ export default {
             })
 
             // Create editor.
-            const editor = monaco.editor.create(this.$refs.monaco, {
-                model,
-                theme: dark ? "vs-dark" : "vs",
-                ...EDITOR_OPTS,
-            })
-            this.updateMarkers(editor, messages, true)
+            const editor = monaco.editor.create(
+                this.$refs.monaco,
+                Object.assign(
+                    { model, theme: dark ? "vs-dark" : "vs" },
+                    EDITOR_OPTS
+                )
+            )
+            this.updateMarkers(editor, messages)
 
             return editor
         },
@@ -479,11 +327,16 @@ export default {
             } = this
 
             // Somehow `createDiffEditor` doesn't have `model` option.
-            const editor = monaco.editor.createDiffEditor(this.$refs.monaco, {
-                originalEditable: true,
-                theme: dark ? "vs-dark" : "vs",
-                ...EDITOR_OPTS,
-            })
+            const editor = monaco.editor.createDiffEditor(
+                this.$refs.monaco,
+                Object.assign(
+                    {
+                        originalEditable: true,
+                        theme: dark ? "vs-dark" : "vs",
+                    },
+                    EDITOR_OPTS
+                )
+            )
             const original = monaco.editor.createModel(code, language)
             const modified = monaco.editor.createModel(fixedCode, language)
             const leftEditor = editor.getOriginalEditor()
@@ -505,37 +358,29 @@ export default {
             editor.setModel({ original, modified })
 
             // Set markers.
-            this.updateMarkers(leftEditor, messages, true)
+            this.updateMarkers(leftEditor, messages)
             this.updateMarkers(rightEditor, fixedMessages)
 
             return editor
         },
 
         messageToMarker(message) {
-            const { monaco, linter } = this
-            const rule = message.ruleId && linter.getRules().get(message.ruleId)
-            const docUrl =
-                rule && rule.meta && rule.meta.docs && rule.meta.docs.url
+            const { monaco } = this
             const startLineNumber = ensurePositiveInt(message.line, 1)
             const startColumn = ensurePositiveInt(message.column, 1)
             const endLineNumber = ensurePositiveInt(
                 message.endLine,
-                startLineNumber,
+                startLineNumber
             )
             const endColumn = ensurePositiveInt(
                 message.endColumn,
-                startColumn + 1,
+                startColumn + 1
             )
 
-            const code = docUrl
-                ? { value: message.ruleId, link: docUrl }
-                : message.ruleId || "FATAL"
-
             return {
-                code,
                 severity: monaco.MarkerSeverity.Error,
                 source: "ESLint",
-                message: message.message,
+                message: `${message.message} (${message.ruleId || "FATAL"})`,
                 startLineNumber,
                 startColumn,
                 endLineNumber,
@@ -543,25 +388,11 @@ export default {
             }
         },
 
-        updateMarkers(editor, messages, storeMessageMap) {
-            const { monaco, editorMessageMap } = this
+        updateMarkers(editor, messages) {
+            const { monaco } = this
             const model = editor.getModel()
             const id = editor.getId()
-
-            editorMessageMap.delete(model.uri)
-            const markers = []
-            let messageMap = null
-            if (storeMessageMap) {
-                messageMap = new Map()
-                editorMessageMap.set(model.uri, messageMap)
-            }
-            for (const message of messages) {
-                const marker = this.messageToMarker(message)
-                markers.push(marker)
-                if (storeMessageMap) {
-                    messageMap.set(computeKey(marker), message)
-                }
-            }
+            const markers = messages.map(this.messageToMarker, this)
 
             monaco.editor.setModelMarkers(model, id, markers)
         },
@@ -596,7 +427,6 @@ export default {
             if (editor == null || linter == null) {
                 return
             }
-            this.editorMessageMap.clear()
             const model = editor.getModel()
             const code = model.getValue()
 
@@ -783,7 +613,7 @@ export default {
 .eslint-editor-placeholder-loading-icon > div {
     position: absolute;
     border-radius: 50%;
-    border-color: #3eaf7c;
+    border-color: #03a9f4;
     border-width: 2px;
     border-style: none solid none solid;
     animation: ESLintEditorLoadingIcon 1s linear infinite;

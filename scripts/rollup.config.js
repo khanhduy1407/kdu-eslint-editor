@@ -1,19 +1,20 @@
+/**
+ * @author NKDuy
+ * See LICENSE file in root directory for full license.
+ */
 import css from "./rollup-plugin/css"
 import removeRequireCalls from "./rollup-plugin/remove-require-calls"
 import resolve from "./rollup-plugin/resolve"
 import worker from "./rollup-plugin/worker"
 
 export default {
+    experimentalDynamicImport: true,
     input: "./src/monaco.js",
-    onwarn(w) {
-        if (w.code === "THIS_IS_UNDEFINED") {
-            return
-        }
-        console.warn("%s", w)
+    onwarn() {
+        // Ignore.
     },
     output: {
-        chunkFileNames: "[name].js",
-        dir: "./dist",
+        file: "./dist/monaco.js",
         format: "es",
     },
     plugins: [css(), removeRequireCalls(), resolve(), worker()],
